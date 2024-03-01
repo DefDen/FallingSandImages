@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 from scipy.stats import gaussian_kde
 
-def image_to_board(image_name, image_folder='img/', scale=0.05):
+def image_to_ascii(image_name, image_folder='img/', scale=0.05):
     '''
     Takes an image and returns a matrix representing the image in ascii 
     characters.
@@ -17,6 +17,30 @@ def image_to_board(image_name, image_folder='img/', scale=0.05):
         Returns:
             list of list of char: An ascii representation of the image based on 
                 brightness of pixels.
+
+        Raises:
+            FileNotFoundException: If the file is not found in the image folder.
+            PIL.UnidentifiedImageError: If the image cannot be opened and 
+                identified.
+    '''
+    p = image_to_percentile(image_name, image_folder=image_folder, scale=scale)
+    return [list(map(brightness_percentile_to_ascii, row)) for row in p]
+
+def image_to_percentile(image_name, image_folder='img/', scale=0.05):
+    '''
+    Takes an image and returns a matrix representing the brightness of each
+    pixel as a percent compared to a gaussian distribution.
+
+        Params:
+            image_name (string): The file name of the image.
+            image_folder (string, optional): The folder of the image. Defaults 
+                to 'img/'.
+            scale (float, optional): The value to scale the image by. Defaults
+                to 0.05.
+
+        Returns:
+            list of list of float: A representation of the relative brightness
+                of each pixel.
 
         Raises:
             FileNotFoundException: If the file is not found in the image folder.
@@ -39,13 +63,12 @@ def image_to_board(image_name, image_folder='img/', scale=0.05):
             total_brightness = sum(pixels[x, y])
             brightnesses.append(total_brightness)
 
-    distribution = gaussian_kde(brightnesses)
+    dist = gaussian_kde(brightnesses)
     board = [[' ' for _ in range(width)] for _ in range(height)]
 
     for x in range(width):
         for y in range(height):
-            percentile = distribution.integrate_box_1d(-np.inf, sum(pixels[x, y]))
-            board[y][x] = brightness_percentile_to_ascii(percentile)
+            board[y][x] = dist.integrate_box_1d(-np.inf, sum(pixels[x, y]))
 
     return board
 
@@ -88,4 +111,4 @@ def list_to_string(l):
         s += '\n'
     return s
 
-print(list_to_string(image_to_board('mona_lisa.jpg')))
+print(list_to_string(image_to_ascii('mona_lisa.jpg')))
