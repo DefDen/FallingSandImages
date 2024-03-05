@@ -1,8 +1,13 @@
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+import scipy.stats as stats
+from sklearn.mixture import GaussianMixture
 
-def image_to_ascii(image_name, image_folder='img/', scale=0.05):
+plt.switch_backend('Agg')
+
+def image_to_ascii(image_name, image_folder='img/', n_components=1, scale=0.05):
     '''
     Takes an image and returns a matrix representing the image in ascii 
     characters.
@@ -11,6 +16,8 @@ def image_to_ascii(image_name, image_folder='img/', scale=0.05):
             image_name (string): The file name of the image.
             image_folder (string, optional): The folder of the image. Defaults 
                 to 'img/'.
+            n_components (int, optional): The number of gaussian distributions
+                to fit to. 
             scale (float, optional): The value to scale the image by. Defaults
                 to 0.05.
 
@@ -26,7 +33,7 @@ def image_to_ascii(image_name, image_folder='img/', scale=0.05):
     p = image_to_percentile(image_name, image_folder=image_folder, scale=scale)
     return [list(map(brightness_percentile_to_ascii, row)) for row in p]
 
-def image_to_percentile(image_name, image_folder='img/', scale=0.05):
+def image_to_percentile(image_name, image_folder='img/', n_components=1, scale=0.05):
     '''
     Takes an image and returns a matrix representing the brightness of each
     pixel as a percent compared to a gaussian distribution.
@@ -35,6 +42,8 @@ def image_to_percentile(image_name, image_folder='img/', scale=0.05):
             image_name (string): The file name of the image.
             image_folder (string, optional): The folder of the image. Defaults 
                 to 'img/'.
+            n_components (int, optional): The number of gaussian distributions
+                to fit to. 
             scale (float, optional): The value to scale the image by. Defaults
                 to 0.05.
 
@@ -54,21 +63,36 @@ def image_to_percentile(image_name, image_folder='img/', scale=0.05):
     height = int(height * scale)
     image = image.resize((width, height))
 
+    brightnesses = np.zeros((height, width))
+    board = np.zeros((height, width))
+
     pixels = image.load()
 
-    brightnesses = []
+    for y in range(height):
+        for x in range(width):
+            brightnesses[y][x] = sum(pixels[x, y])
 
-    for x in range(width):
-        for y in range(height):
-            total_brightness = sum(pixels[x, y])
-            brightnesses.append(total_brightness)
+    gmm = GaussianMixture(n_components=n_components)
+    X = brightnesses.flatten().reshape(-1,1)
+    gmm.fit(X)
+    x = np.linspace(-5, 10, 192)
+    x = x.reshape(-1, 1)
 
-    dist = gaussian_kde(brightnesses)
-    board = [[' ' for _ in range(width)] for _ in range(height)]
+    plt.hist(X, bins=30, density=True, alpha=0.5)
 
-    for x in range(width):
-        for y in range(height):
-            board[y][x] = dist.integrate_box_1d(-np.inf, sum(pixels[x, y]))
+    for i in range(len(gmm.weights_)):
+        y = gmm.weights_[i] * stats.norm.pdf(x, gmm.means_[i], np.sqrt(gmm.covariances_[i]))
+        plt.plot(x, y)
+
+    plt.xlabel('Value')
+    plt.ylabel('Density')
+    plt.title('Histogram of Sampled Data with Gaussian Mixture Model')
+    plt.savefig('a.png')
+
+    for y in range(height):
+        for x in range(width):
+            for i in range(n_components):
+                board[y][x] = gmm.weights_[i] * stats.norm.cdf(brightnesses[y, x], gmm.means_[i,0], np.sqrt(gmm.covariances_[i,0,0]))
 
     return board
 
@@ -111,4 +135,4 @@ def list_to_string(l):
         s += '\n'
     return s
 
-print(list_to_string(image_to_ascii('astronaut.jpg', scale=0.03)))
+print(list_to_string(image_to_ascii('mona_lisa.jpg', n_components=2, scale=0.03)))
