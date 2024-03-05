@@ -1,11 +1,8 @@
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import scipy.stats as stats
 from sklearn.mixture import GaussianMixture
-
-plt.switch_backend('Agg')
 
 def image_to_ascii(image_name, image_folder='img/', n_components=1, scale=0.05):
     '''
@@ -73,21 +70,7 @@ def image_to_percentile(image_name, image_folder='img/', n_components=1, scale=0
             brightnesses[y][x] = sum(pixels[x, y])
 
     gmm = GaussianMixture(n_components=n_components)
-    X = brightnesses.flatten().reshape(-1,1)
-    gmm.fit(X)
-    x = np.linspace(-5, 10, 192)
-    x = x.reshape(-1, 1)
-
-    plt.hist(X, bins=30, density=True, alpha=0.5)
-
-    for i in range(len(gmm.weights_)):
-        y = gmm.weights_[i] * stats.norm.pdf(x, gmm.means_[i], np.sqrt(gmm.covariances_[i]))
-        plt.plot(x, y)
-
-    plt.xlabel('Value')
-    plt.ylabel('Density')
-    plt.title('Histogram of Sampled Data with Gaussian Mixture Model')
-    plt.savefig('a.png')
+    gmm.fit(brightnesses.flatten().reshape(-1,1))
 
     for y in range(height):
         for x in range(width):
@@ -110,8 +93,8 @@ def brightness_percentile_to_ascii(percentile):
     '''
     chars = [ ' ', '.', '\'', ',', ':', ';', '=', '+', '#', '@' ]
 
-    if percentile > 1:
-        percentile = 1
+    if percentile >= 1:
+        percentile = 0.9
     if percentile < 0:
         percentile = 0
 
@@ -135,4 +118,4 @@ def list_to_string(l):
         s += '\n'
     return s
 
-print(list_to_string(image_to_ascii('mona_lisa.jpg', n_components=2, scale=0.03)))
+print(list_to_string(image_to_ascii('astronaut.jpg', n_components=5, scale=0.03)))
